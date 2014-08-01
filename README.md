@@ -1,0 +1,4 @@
+simpleSlider
+============
+
+jQuery slider plugin
