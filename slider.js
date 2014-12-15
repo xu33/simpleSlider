@@ -31,6 +31,35 @@ function Slider(wrapper, prevBtn, nextBtn, ctrls) {
         var startLeft = -sliderWidth
         var currentLeft = -sliderWidth
 
+        function firstElementChildOf(el) {
+            var child = el.firstChild
+            while (child && child.nodeType != 1) {
+                child = child.nextSibling
+            }
+
+            return child
+        }
+
+        function updateWrapper() {
+            var height = 0
+            var el = firstElementChildOf(wrapper[0])
+
+            do {
+                height = $(el).height()
+                el = firstElementChildOf(el)
+            } while (!height && el)
+
+            if (height) {
+                wrapper.css({
+                    'height': height,
+                    'overflow': 'hidden',
+                    'position': 'relative'
+                })
+            }
+        }
+
+        updateWrapper()
+
         function _slide(left, callback) {
             move = true
             timer && clearTimeout(timer)
