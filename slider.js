@@ -1,123 +1,148 @@
-(function() {
-    // wrapper->slider->slides
-    function Slider(wrapper, settings) {
-        this.wrapper = wrapper
-        this.settings = settings
-        this.wrapper.css({
-            overflow: 'hidden',
-            position: 'relative'
+function Slider(wrapper, prevBtn, nextBtn, ctrls) {
+        var sliderWidth = wrapper.width()
+        var slider = $(wrapper.children()[0]).css('position', 'absolute')
+        var slides = slider.children()
+
+        var total = slides.length
+        var cloneAfter = $(slides[0]).clone(true)
+        var cloneBefore = $(slides[slides.length - 1]).clone(true)
+
+        slider.prepend(cloneBefore)
+        slider.append(cloneAfter)
+
+        slides = slider.children()
+
+        slides.each(function(index, slideItem) {
+            $(slideItem).css({
+                position: 'absolute',
+                left: sliderWidth * index,
+                width: sliderWidth
+            })
         })
-        this.muitl = 0
-        this.page = 0
-        this.lastPage = this.page
-        this.slider = this.wrapper.children().first().css('position', 'absolute')
-        this.ttl = this.slider.children().length
 
-        this.step = this.wrapper.width()
-        console.log(this.step)
-        this.positionChilds()
-        this.initPointers()
+        slider.css({
+            width: sliderWidth * slides.length,
+            left: -sliderWidth
+        })
 
-        this.startTicker()
-    }
+        var timer
+        var currentPage = 0
+        var move = false
+        var startLeft = -sliderWidth
+        var currentLeft = -sliderWidth
 
-    Slider.prototype = $.extend(Slider.prototype, {
-        positionChilds: function() {
-            var childs = this.slider.children()
-            for (var i = 0; i < childs.length; i++) {
-                $(childs[i]).css({
-                    position: 'absolute',
-                    left: this.step * i,
-                    width: this.wrapper.width()
-                })
+        function _slide(left, callback) {
+            move = true
+            timer && clearTimeout(timer)
+            slider.animate({
+                left: left
+            }, {
+                duration: 400,
+                complete: function() {
+                    callback && callback()
+                    moveNextLater()
+                    updatePointer()
 
-                if (i == 0) {
-                    this.wrapper.css('height', $(childs[i]).height())
+                    move = false
                 }
+            })
+        }
+
+        function slidePrev() {
+            if (move === true) {
+                return false
             }
 
-            this.childs = childs
-        },
-        initPointers: function() {
-            var self = this
-            this.currPoint = this.settings.pointers.first()
-            this.settings.pointers.each(function(i, pointer) {
-                $(pointer).on('click', {page: i}, function(e) {
-                    var realPage = self.page % self.ttl
-                    var clickedPage = e.data.page
+            currentPage = currentPage - 1
+            currentLeft = currentLeft + sliderWidth
 
-                    self.page = self.page + (clickedPage - realPage)
+            _slide(currentLeft, function() {
+                if (currentPage < 0) {
+                    currentPage = total - 1
+                    currentLeft = startLeft - currentPage * sliderWidth
+                    slider.css({
+                        left: currentLeft
+                    })
+                }
+            })
+        }
 
-                    console.log('self.page:', self.page)
-                    self.slide(self.page)
+        function slideNext() {
+            if (move === true) {
+                return false
+            }
+
+            currentPage = currentPage + 1
+            currentLeft = currentLeft - sliderWidth
+
+            _slide(currentLeft, function() {
+                if (currentPage > total - 1) {
+                    currentPage = 0
+                    currentLeft = startLeft
+                    slider.css({
+                        left: startLeft
+                    })
+                }
+            })
+        }
+
+        function moveNextLater() {
+            timer && clearTimeout(timer)
+            timer = setTimeout(function() {
+                slideNext()
+            }, 4000)
+        }
+
+        function updatePointer() {
+            ctrls.each(function(i, o) {
+                if (i === currentPage) {
+                    $(o).addClass('active')
+                } else {
+                    $(o).removeClass('active')
+                }
+            })
+        }
+
+        wrapper.on('mouseenter', function() {
+            clearTimeout(timer)
+        })
+
+        wrapper.on('mouseleave', function() {
+            moveNextLater()
+        })
+
+        if (ctrls) {
+            ctrls.each(function(index, ctrl) {
+                $(ctrl).on('click', {page: index}, function(e) {
+                    var page = e.data.page
+                    console.log('page:', page, currentPage)
+                    if (page === currentPage) {
+                        return
+                    } else {
+                        if (move) {
+                            return
+                        }
+                        
+                        currentLeft = currentLeft - (page - currentPage) * sliderWidth
+                        currentPage = page
+                        _slide(currentLeft)
+                    }
                 })
             })
-        },
-        slide: function(page) {
-            var self = this
-            if (page == self.lastPage) {
-                return 
-            }
-
-            self.prepare(page, page - self.lastPage)
-            self.lastPage = page
-            setTimeout(function(){
-                var cls = self.settings.currentPointClass || 'cur'
-                self.stopTicker()
-                self.slider.stop().animate({
-                    left: -self.step * page
-                }, {
-                    duration: 400,
-                    complete: function() {
-                        var realPage = page % self.ttl
-
-                        self.currPoint.removeClass(cls)
-                        self.currPoint = $(self.settings.pointers[realPage])
-                        self.currPoint.addClass(cls)
-                        self.startTicker()
-                    }
-                })
-            }, 17)
-        },
-        prepare: function(page, cross) {
-            console.log('cross:', cross)
-            var multi = Math.floor(page / this.ttl)
-            if (multi > 0) {
-                if (cross > 0) {
-                    for (var i = 0; i < cross; i ++) {
-                        var _page = page % this.ttl - i
-                        var left = this.ttl * this.step * multi + this.step * _page
-
-                        $(this.childs[_page]).css('left', left)
-                    }
-                } else {
-                    for (var i = cross; i >= 0; i ++) {
-                        var _page = page % this.ttl + i
-                        var left = this.ttl * this.step * multi - this.step * _page
-
-                        $(this.childs[_page]).css('left', left)
-                    }
-                }
-            }
-        },
-        startTicker: function() {
-            var self = this
-            self.ticker = setInterval(function() {
-                self.page++
-
-                // if (self.page >= self.ttl) {
-                //     self.page = 0
-                // }
-
-                self.slide(self.page)
-            }, 2000)
-        },
-        stopTicker: function() {
-            clearInterval(this.ticker)
         }
-    })
 
-    $.fn.slider = function(settings) {
-        return new Slider($(this), settings)
+        if (prevBtn) {
+            prevBtn.on('click', function(e) {
+                slidePrev()
+            })
+        }
+
+        if (nextBtn) {
+            nextBtn.on('click', function(e) {
+                slideNext()
+            })
+        }
+
+        updatePointer()
+        moveNextLater()
     }
-}())
