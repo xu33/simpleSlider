@@ -1,14 +1,28 @@
 function Slider(wrapper, prevBtn, nextBtn, ctrls) {
         var sliderWidth = wrapper.width()
-        var slider = $(wrapper.children()[0]).css('position', 'absolute')
+        var slider = $(wrapper.children()[0])
         var slides = slider.children()
 
+        slides.each(function(i, o) {
+            $(o).addClass('page' + i)
+        })
+
+        if (slides.length <= 1) {
+            prevBtn && prevBtn.hide()
+            nextBtn && nextBtn.hide()
+            ctrls && ctrls.hide()
+            return
+        }
+
+        slider.css('position', 'absolute')
         var total = slides.length
         var cloneAfter = $(slides[0]).clone(true)
         var cloneBefore = $(slides[slides.length - 1]).clone(true)
-
         slider.prepend(cloneBefore)
         slider.append(cloneAfter)
+
+        cloneBefore.addClass('page' + (slides.length - 1))
+        cloneAfter.addClass('page0')
 
         slides = slider.children()
 
@@ -30,35 +44,9 @@ function Slider(wrapper, prevBtn, nextBtn, ctrls) {
         var move = false
         var startLeft = -sliderWidth
         var currentLeft = -sliderWidth
-
-        function firstElementChildOf(el) {
-            var child = el.firstChild
-            while (child && child.nodeType != 1) {
-                child = child.nextSibling
-            }
-
-            return child
-        }
-
-        function updateWrapper() {
-            var height = 0
-            var el = firstElementChildOf(wrapper[0])
-
-            do {
-                height = $(el).height()
-                el = firstElementChildOf(el)
-            } while (!height && el)
-
-            if (height) {
-                wrapper.css({
-                    'height': height,
-                    'overflow': 'hidden',
-                    'position': 'relative'
-                })
-            }
-        }
-
-        updateWrapper()
+        var autoPlay = true
+        var playInterval = 1000
+        var eventEmitter = $({})
 
         function _slide(left, callback) {
             move = true
@@ -73,6 +61,8 @@ function Slider(wrapper, prevBtn, nextBtn, ctrls) {
                     updatePointer()
 
                     move = false
+
+                    eventEmitter.triggerHandler('change', currentPage)
                 }
             })
         }
@@ -116,13 +106,23 @@ function Slider(wrapper, prevBtn, nextBtn, ctrls) {
         }
 
         function moveNextLater() {
+            if (!autoPlay) {
+                return
+            }
+
             timer && clearTimeout(timer)
             timer = setTimeout(function() {
+                if (!autoPlay) {
+                    return
+                }
                 slideNext()
-            }, 4000)
+            }, playInterval)
         }
 
         function updatePointer() {
+			if (!ctrls) {
+				return
+			}
             ctrls.each(function(i, o) {
                 if (i === currentPage) {
                     $(o).addClass('active')
@@ -144,7 +144,6 @@ function Slider(wrapper, prevBtn, nextBtn, ctrls) {
             ctrls.each(function(index, ctrl) {
                 $(ctrl).on('click', {page: index}, function(e) {
                     var page = e.data.page
-                    console.log('page:', page, currentPage)
                     if (page === currentPage) {
                         return
                     } else {
@@ -173,5 +172,25 @@ function Slider(wrapper, prevBtn, nextBtn, ctrls) {
         }
 
         updatePointer()
-        moveNextLater()
+        //moveNextLater()
+
+        return {
+            element: wrapper,
+            getCurrentPage: function() {
+                return currentPage
+            },
+            stopAutoPlay: function() {
+                autoPlay = false
+            },
+            startAutoPlay: function() {
+                autoPlay = true;
+				moveNextLater();
+            },
+            setPlayInterval: function(n) {
+                playInterval = n
+            },
+            onchange: function(fn) {
+                eventEmitter.on('change', fn)
+            }
+        }
     }
